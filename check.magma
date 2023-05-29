@@ -1,0 +1,300 @@
+function MakesRamExt(BaseField, poly)
+    Loc := LocalField(BaseField, poly);
+    RamInd := Valuation(Loc!UniformizingElement(BaseField));
+    return RamInd eq Degree(poly);
+end function;
+
+function PolyToExtsOfK(BaseField, coefs)
+    S<y> := PolynomialRing(BaseField);
+    FactorArr := Factorization(S!coefs);
+    // might be losing fields here
+    g_arr := [];
+    for factor in FactorArr do
+        g := factor[1];
+        Loc := LocalField(BaseField, g);
+        RamInd := Valuation(Loc!UniformizingElement(BaseField));
+        if RamInd eq 4 and Degree(g) eq 4 then 
+            minpoly := MinimalPolynomial(UniformizingElement(Loc), BaseField);
+            g_arr := g_arr cat [minpoly];
+        end if;
+    end for;
+    L_arr := [];
+    for g in g_arr do
+        L_arr := L_arr cat [TotallyRamifiedExtension(BaseField, g)];
+    end for; 
+    unique := [1 : i in [1..#L_arr]];
+    for i in [1..#L_arr - 1] do
+        for j in [i + 1..#L_arr] do
+            if HasRoot(g_arr[i], L_arr[j]) then 
+                unique[j] := 0;
+            end if;
+        end for;
+    end for;
+    final := [L_arr[i] : i in [1..#L_arr] | unique[i] eq 1];
+    return final;
+end function;
+
+function RepsOfUiQuotient(BaseField, i)
+// for i \geq 1, returns representatives of U^i / U^(i+1)
+    pi_K := UniformizingElement(BaseField);
+    k := ResidueClassField(IntegerRing(BaseField));
+    if i gt 0 then
+        return [1 + pi_K^i * (BaseField!x) : x in Set(k)];
+    else 
+        return [BaseField!x : x in Set(k) | x ne 0];        
+    end if;
+end function; 
+
+function Findt0(BaseField)
+    eK := RamificationIndex(BaseField, ChangePrecision(pAdicField(2), 100));
+    n0 := 0;
+    for n in [0..eK] do
+        norms := [Norm(x, ChangePrecision(pAdicField(2), 100)) : 
+            x in RepsOfUiQuotient(BaseField,n)];
+        if false in [Valuation(norm - 1) ge 2 : norm in norms] then 
+            n0 := n + 1;
+        end if;
+    end for;
+    return Ceiling(n0 / 2);
+end function;
+
+function AllTotRamQuartics(BaseField, CoefArr : verbose:=false)
+    QuarticArr := [];
+    start := Realtime();
+    for i in [1..#CoefArr] do
+        if verbose and i mod 100 eq 0 then 
+            print(<i, #CoefArr>); 
+            print("Time elapsed (s):");
+            print(Realtime() - start);
+        end if;
+        coefs := CoefArr[i];
+        QuarticArr := QuarticArr cat PolyToExtsOfK(BaseField, coefs);
+    end for;
+    return QuarticArr;
+end function;
+
+function Indi(bool)
+    if bool then return 1;
+    else return 0;
+    end if;
+end function;
+
+function GetGG(L,BaseField)
+    Aut, m := AutomorphismGroup(L,BaseField);
+    f := MinimalPolynomial(UniformizingElement(L), BaseField);
+    PolyDisc := Discriminant(f);
+    if #Aut eq 4 and Exponent(Aut) eq 4 then return "C4";
+    elif #Aut eq 4 and Exponent(Aut) eq 2 then return "V4";
+    elif #Aut eq 2 then return "D4";
+    elif #Aut eq 1 and IsSquare(BaseField!PolyDisc) then return "A4";
+    elif #Aut eq 1 and not IsSquare(BaseField!PolyDisc) then return "S4";
+    end if;
+end function;
+
+function GetGGArr(BaseField, ExtArr : verbose:=false)
+    GGArr := [];
+    start := Realtime();
+    for i in [1..#ExtArr] do 
+        if verbose and i mod 100 eq 0 then 
+            print(<i, #ExtArr>);
+            print("Time elapsed (s):");
+            print(Realtime() - start);
+        end if;
+        L := ExtArr[i];
+        GGArr := GGArr cat [GetGG(L, BaseField)]; 
+    end for;
+    return GGArr;
+end function;
+    
+
+function Indi(bool)
+    if bool then return 1;
+    else return 0;
+    end if;
+end function;
+
+
+function PredS4(BaseField, m)
+    eK := Valuation(BaseField!2);
+    fK := AbsoluteInertiaDegree(BaseField);
+    q := 2^fK;
+    if fK mod 2 eq 0 then return 0; 
+    else
+        if 4 le m and m le 6*eK + 2 and (m mod 6 in [2, 4]) then 
+            return q^(Floor(m/3) - 1) * (q-1);
+        else return 0;
+        end if;
+    end if;
+end function;
+
+function PredA4(BaseField, m)
+    eK := Valuation(BaseField!2);
+    fK := AbsoluteInertiaDegree(BaseField);
+    q := 2^fK;
+    if 4 le m and m le 6*eK + 2 and m mod 2 eq 0 then
+        OneAutPred := q^(Floor(m/3) - 1) * (q-1) * (1 + Indi(m mod 6 eq 0) * (1 - 2*q)/(3*q));
+        if fK mod 2 eq 0 then return OneAutPred; 
+        else
+            if m mod 6 eq 0 then return OneAutPred; 
+            else return 0;
+            end if;
+        end if;
+    else return 0;
+    end if;
+end function;
+    
+function PredV4(BaseField, m)
+    eK := Valuation(BaseField!2);
+    fK := AbsoluteInertiaDegree(BaseField);
+    q := 2^fK;
+    if 6 le m and m le 6*eK + 2 and m mod 2 eq 0 then
+        return 2 * (q - 1) * q^((m-4)/2) * (
+            q^(-Floor(m/6)) * (1 + Indi(m mod 3 eq 0) * ((q-2)/3))
+            - Indi(m le 4*eK + 2) * q^(-Floor((m-2)/4))
+            );
+    else return 0;
+    end if;
+end function;
+
+function PredC4(BaseField, m)
+    eK := Valuation(BaseField!2);
+    fK := AbsoluteInertiaDegree(BaseField);
+    q := 2^fK;
+    t0 := Findt0(BaseField);
+    if 8 le m and m le 8*eK and m mod 2 eq 0 then
+        quant1 := Indi(8 le m and m le 5*eK - 2 and m mod 5 eq 3) * 2 * 
+         q^((3*m - 14)/10) * (q-1);
+        quant2 := Indi(4*eK + 4 le m and m le 5*eK + 2) * 2 * q^(m/2 - eK - 2) * (q-1);
+        quant3 := Indi(5*eK lt m and m le 8*eK and (m - 2*eK) mod 3 eq 0) * 
+                2 * q^((4*eK + m)/6 - 1) * (1 + Indi(m le 8*eK - 6*t0)) * 
+                (q - 1 - Indi(m eq 8*eK - 6*t0 + 6));
+        quant4 := Indi(10 le m and m le 5*eK) * 2 * (q-1) * (q^(Floor(3*m/10) - 1) - 
+            q^(Max(Ceiling((m+2)/4), m/2 - eK) - 2));
+        return quant1 + quant2 + quant3 + quant4;
+        
+        
+    elif m eq 8*eK + 3 then 
+        if IsSquare(BaseField!(-1)) then return 4 * q^(2*eK);
+        elif t0 eq 0 then return 0;
+        else return 2*q^(2*eK);
+        end if;
+    else return 0;
+    end if;
+end function;
+    
+    
+function PredD4(BaseField, m)
+    eK := Valuation(BaseField!2);
+    fK := AbsoluteInertiaDegree(BaseField);
+    q := 2^fK;
+    if 6 le m and m le 8*eK + 2 and m mod 2 eq 0 then 
+        return 2 * (q-1) * q^((m/2) - 2) * (
+            Indi(m ge 4*eK + 4) * q^(-eK) +
+            Indi(4 le m and m le 8*eK) * (q^(Min(0, eK + 1 - Ceiling(m/4))) - 
+                q^(- Min(Floor((m-2)/4), eK)))) - (1/2) * PredC4(BaseField,m) - 
+                (3/2) * PredV4(BaseField,m);
+    elif m mod 4 eq 1 and 4*eK + 5 le m and m le 8*eK + 1 then 
+        return 2 * (q-1) * q^(eK + (m-1)/4 - 1) - (1/2) * PredC4(BaseField,m) - 
+        (3/2) * PredV4(BaseField,m);
+    elif m eq 8*eK + 3 then return 2*q^(3*eK) - (1/2) * PredC4(BaseField, 8*eK + 3);
+    else return 0;
+    end if;
+end function;
+
+function Pred(G, BaseField, m)
+    if G eq "S4" then return PredS4(BaseField, m);
+    elif G eq "A4" then return PredA4(BaseField,m);
+    elif G eq "V4" then return PredV4(BaseField,m);
+    elif G eq "C4" then return PredC4(BaseField, m);
+    elif G eq "D4" then return PredD4(BaseField,m);
+    end if;
+end function;
+
+function FullCycle(BaseField, polys : verbose:=false)
+    if verbose then print("Finding all quartic extensions of basefield.."); end if;
+    quartics := AllTotRamQuartics(BaseField, polys : verbose:=verbose);
+    if verbose then print("Finding Galois groups of quartic extensions.."); end if;
+    GG_arr := GetGGArr(BaseField, quartics : verbose:=verbose);
+    lookup := AssociativeArray();
+    lookup["S4"] := [quartics[i] : i in [1..#quartics] | GG_arr[i] eq "S4"];
+    lookup["A4"] := [quartics[i] : i in [1..#quartics] | GG_arr[i] eq "A4"];
+    lookup["C4"] := [quartics[i] : i in [1..#quartics] | GG_arr[i] eq "C4"];
+    lookup["V4"] := [quartics[i] : i in [1..#quartics] | GG_arr[i] eq "V4"];
+    lookup["D4"] := [quartics[i] : i in [1..#quartics] | GG_arr[i] eq "D4"];
+    
+    eK := AbsoluteRamificationIndex(BaseField);
+    
+    counterexample := false;
+    for G in ["S4", "A4", "C4", "V4", "D4"] do 
+        for m in [0..8*eK + 10] do
+            actual := #[L : L in lookup[G] | Valuation(Discriminant(L,BaseField)) eq m];
+            pred := Pred(G, BaseField, m);
+            if actual ne pred then counterexample :=true; print("CATASTROPHE");
+            print(m); print(G); print(<actual,pred>);
+            end if;
+        end for;
+    end for;
+    if not counterexample then print("All checks successful for given basefield!"); end if;
+    return 0;
+end function;
+
+
+// actually do the checks
+
+// K = Q2
+k0 := ChangePrecision(pAdicField(2), 100);
+R<x> := PolynomialRing(k0);
+K := k0;
+load "e4f1.txt";
+start := Realtime();
+print("Testing results for K = Q2..");
+a := FullCycle(K, polys);
+print("Seconds taken: " cat IntegerToString(Floor(Realtime() - start)));
+
+// K quadratic unramified
+load "e4f2.txt";
+K := UnramifiedExtension(k0, 2);
+start := Realtime();
+print("Testing results for K quadratic unramified K..");
+a := FullCycle(K, polys);
+print("Seconds taken: " cat IntegerToString(Floor(Realtime() - start)));
+
+// K quadratic totally ramified
+load "e8f1.txt";
+EisenArr := [x^2 + 2*x + 2, 
+    x^2 + 2*x + 6,
+    x^2 + 4*x + 2,
+    x^2 + 4*x + 10,
+    x^2 + 2,
+    x^2 + 10];
+poly_strings := ["x^2 + 2x + 2",
+    "x^2 + 2x + 6",
+    "x^2 + 4x + 2",
+    "x^2 + 4x + 10",
+    "x^2 + 2",
+    "x^2 + 10"];
+for i in [1..#EisenArr] do
+    f := EisenArr[i];
+    K := TotallyRamifiedExtension(k0, f);
+    start := Realtime();
+    print("Testing results for totally ramified K/Q2 defined by polynomial " cat 
+        poly_strings[i] cat "..");
+    a := FullCycle(K, polys);
+    print("Seconds taken: " cat IntegerToString(Floor(Realtime() - start)));
+end for;
+
+// K cubic unramified
+load "e4f3.txt";
+K := UnramifiedExtension(k0, 3);
+start := Realtime();
+print("Testing results for cubic unramified K..");
+a := FullCycle(K, polys);
+print("Seconds taken: " cat IntegerToString(Floor(Realtime() - start)));
+
+// K cubic totally ramified
+load "e12f1.txt";
+K := TotallyRamifiedExtension(k0, x^3 + 2);
+start := Realtime();
+print("Testing results for cubic totally ramified K..");
+a := FullCycle(K, polys);
+print("Seconds taken: " cat IntegerToString(Floor(Realtime() - start)));
