@@ -132,16 +132,20 @@ function PredA4(BaseField, m)
     fK := AbsoluteInertiaDegree(BaseField);
     q := 2^fK;
     if 4 le m and m le 6*eK + 2 and m mod 2 eq 0 then
-        OneAutPred := q^(Floor(m/3) - 1) * (q-1) * (1 + Indi(m mod 6 eq 0) * (1 - 2*q)/(3*q));
-        if fK mod 2 eq 0 then return OneAutPred; 
-        else
-            if m mod 6 eq 0 then return OneAutPred; 
-            else return 0;
+        if fK mod 2 eq 0 then 
+            if m mod 3 eq 0 then return (1/3) * q^(Floor(m/3) - 2) * (q^2 - 1);
+            else return q^(Floor(m/3) - 1)*(q-1);
+            end if;
+        else 
+            if m mod 3 eq 0 then return (1/3) * q^(Floor(m/3) - 2) * (q^2 - 1);
+            else return 0; 
             end if;
         end if;
     else return 0;
     end if;
 end function;
+    
+
     
 function PredV4(BaseField, m)
     eK := Valuation(BaseField!2);
@@ -165,8 +169,8 @@ function PredC4(BaseField, m)
         quant1 := Indi(8 le m and m le 5*eK - 2 and m mod 5 eq 3) * 2 * 
          q^((3*m - 14)/10) * (q-1);
         quant2 := Indi(4*eK + 4 le m and m le 5*eK + 2) * 2 * q^(m/2 - eK - 2) * (q-1);
-        quant3 := Indi(5*eK lt m and m le 8*eK and (m - 2*eK) mod 3 eq 0) * 
-                2 * q^((4*eK + m)/6 - 1) * (1 + Indi(m le 8*eK - 6*t0)) * 
+        quant3 := Indi(5*eK + 3 le m and m le 8*eK and (m - 2*eK) mod 3 eq 0) * 
+                2 * q^((m + 4*eK)/6 - 1) * (1 + Indi(m le 8*eK - 6*t0)) * 
                 (q - 1 - Indi(m eq 8*eK - 6*t0 + 6));
         quant4 := Indi(10 le m and m le 5*eK) * 2 * (q-1) * (q^(Floor(3*m/10) - 1) - 
             q^(Max(Ceiling((m+2)/4), m/2 - eK) - 2));
@@ -210,6 +214,97 @@ function Pred(G, BaseField, m)
     end if;
 end function;
 
+function GetMass(BaseField, ExtArr, G)
+    q := #ResidueClassField(IntegerRing(BaseField));
+    if G in ["S4", "A4"] then NumAuts := 1;
+    elif G eq "D4" then NumAuts := 2;
+    elif G in ["C4", "V4"] then NumAuts := 4;
+    end if;
+    tot := 0;
+    for L in ExtArr do 
+        m := Valuation(Discriminant(L, BaseField));
+        tot := tot + (1 / NumAuts) * q^(-m);
+    end for;
+    return tot;
+end function;
+
+function MassPredS4(BaseField)
+    eK := AbsoluteRamificationIndex(BaseField);
+    fK := AbsoluteInertiaDegree(BaseField);
+    q := 2^fK;
+    if fK mod 2 eq 0 then return 0; 
+    else
+        return (q^3 + 1)/(q^3 + q^2 + q + 1) * (q^(-3) - q^(-4*eK - 3));
+    end if;
+end function;
+
+function MassPredA4(BaseField)
+    eK := AbsoluteRamificationIndex(BaseField);
+    fK := AbsoluteInertiaDegree(BaseField);
+    q := 2^fK;
+    if fK mod 2 eq 0 then 
+        return (1/3) * (q-1) * (q^(4*eK) - 1) / (q^4 - 1) * q^(-4*eK - 3) * 
+            (3*q^3 + q^2 + q + 3);
+    else return (1/3) * (1 / (q^2 + 1)) * (q^(-2) - q^(-4*eK - 2));
+    end if;
+end function;
+
+function MassPredV4(BaseField)
+    eK := AbsoluteRamificationIndex(BaseField);
+    fK := AbsoluteInertiaDegree(BaseField);
+    q := 2^fK;
+    return ((q - 1)/6) * (q^(-4*eK - 3) * ((q^(4*eK) - 1) / (q^4 - 1)) * (3*q^3 + q^2 + q + 3)
+        - 3*q^(-3*eK - 3) * ((q^(3*eK) - 1) / (q^3 - 1)) * (q^2 + 1));
+end function;
+
+function MassPredC4(BaseField)
+    eK := AbsoluteRamificationIndex(BaseField);
+    fK := AbsoluteInertiaDegree(BaseField);
+    q := 2^fK;
+    t0 := Findt0(BaseField);
+    has_i := IsSquare(BaseField!(-1));
+    
+    quant1 := (1/2) * (q - 1) * (1 - q^(-7*Floor(eK/2))) / (q^7 - 1);
+    quant2 := (1/2) * q^(-3*eK - 3) * (1 - q^(-Floor(eK/2)));
+    quant3 := Indi(2*t0 lt eK) * (q-1) * (q^(-5 * Floor(eK/2) - eK - 1) - 
+            q^(5*t0 - 6*eK -1)) / (q^5 - 1);
+    quant4 := (1/2) * Indi(t0 ge 1) * q^(-6*eK + 5*t0 - 6) * (q-2);
+    quant5 := (1/2) * Indi(t0 ge 2) * (q-1)*(q^(5*t0 - 6*eK - 6) - q^(-6*eK - 1)) / (q^5 - 1);
+    quant6 := Indi(eK ge 2) * (1/2) * (q-1) * q^(-7*Floor(eK/2) - 1) * 
+                (
+                q * (q^(7*Floor(eK/2) - 7) - 1) * (q^6 + q^4 + q^3 + q + 1) / (q^7 - 1)
+                + 1 + Indi(eK mod 2 eq 1) * (q^(-2) + q^(-3))
+                );
+    quant7 := - Indi(eK ge 2) * (1/2) * (q-1)*(q+1)*(q^(-7) - q^(-3*eK - 1)) / (q^3-1);
+    quant8 := - (1/2) * q^(-3*eK - 2) * (1 - q^(-Floor(eK/2)));
+    if has_i then quant9 := q^(-6*eK - 3);
+    elif t0 eq 0 then quant9 := 0;
+    else quant9 := (1/2) * q^(-6*eK - 3);
+    end if;
+    //quant_arr := [quant1, quant2, quant3, quant4, quant5, quant6, quant7,quant8,quant9];
+    //for i in [1..9] do
+    //    print(<i, quant_arr[i]>);
+    //end for;
+    return quant1 + quant2 + quant3 + quant4 + quant5 + quant6 + quant7 + quant8 + quant9;
+end function;
+
+function MassPredD4(BaseField)
+    eK := AbsoluteRamificationIndex(BaseField);
+    fK := AbsoluteInertiaDegree(BaseField);
+    q := 2^fK;
+    return (1 / (q^2 + q + 1)) * (q^(-3*eK - 3) + q^(-3*eK - 1) + q^(-2)) - 
+        MassPredC4(BaseField) - 3*MassPredV4(BaseField);
+end function;
+
+
+function MassPred(BaseField, G)
+    if G eq "S4" then return MassPredS4(BaseField);
+        elif G eq "A4" then return MassPredA4(BaseField);
+        elif G eq "V4" then return MassPredV4(BaseField);
+        elif G eq "C4" then return MassPredC4(BaseField);
+        elif G eq "D4" then return MassPredD4(BaseField);
+    end if;
+end function;
 function FullCycle(BaseField, polys : verbose:=false)
     if verbose then print("Finding all quartic extensions of basefield.."); end if;
     quartics := AllTotRamQuartics(BaseField, polys : verbose:=verbose);
@@ -233,6 +328,10 @@ function FullCycle(BaseField, polys : verbose:=false)
             print(m); print(G); print(<actual,pred>);
             end if;
         end for;
+        if GetMass(BaseField,lookup[G],G) ne MassPred(BaseField, G) then 
+            counterexample :=true; print("CATASTROPHE");
+            print(G); print(<actual,pred>);
+            end if;
     end for;
     if not counterexample then print("All checks successful for given basefield!"); end if;
     return 0;
